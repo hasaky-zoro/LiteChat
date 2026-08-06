@@ -33,6 +33,7 @@ interface ChatState {
   settingsOpen: boolean
   addProvider: (provider: Provider) => void
   updateProvider: (provider: Provider) => void
+  updateProviderModels: (providerId: string, models: Model[]) => void
   removeProvider: (providerId: string) => void
   createSession: () => void
   selectSession: (sessionId: string) => void
@@ -53,6 +54,11 @@ export const useChatStore = create<ChatState>()(
       addProvider: (provider) => set((state) => ({ providers: [...state.providers, provider] })),
       updateProvider: (provider) => set((state) => ({
         providers: state.providers.map((item) => item.id === provider.id ? provider : item),
+      })),
+      updateProviderModels: (providerId, models) => set((state) => ({
+        providers: state.providers.map((provider) => provider.id === providerId
+          ? { ...provider, models: models.map((model) => ({ ...model, providerId })) }
+          : provider),
       })),
       removeProvider: (providerId) => set((state) => ({
         providers: state.providers.filter((provider) => provider.id !== providerId),
