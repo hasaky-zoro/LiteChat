@@ -21,22 +21,22 @@ jobs:
             runner: windows-latest
             target: x86_64-pc-windows-msvc
             args: --target x86_64-pc-windows-msvc
-            asset_name_pattern: LiteChat_x64-setup_{{version}}.{{ext}}
+            asset_name_pattern: LiteChat_Windows_x64_{{version}}.{{ext}}
           - name: macOS Intel (.dmg)
             runner: macos-latest
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
-            asset_name_pattern: LiteChat_x64_{{version}}.dmg
+            asset_name_pattern: LiteChat_macOS_Intel_{{version}}.dmg
           - name: macOS Apple Silicon (.dmg)
             runner: macos-latest
             target: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
-            asset_name_pattern: LiteChat_arm64_{{version}}.dmg
+            asset_name_pattern: LiteChat_macOS_AppleSilicon_{{version}}.dmg
           - name: Linux (.deb, .AppImage)
             runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             args: --target x86_64-unknown-linux-gnu
-            asset_name_pattern: LiteChat_amd64_{{version}}.{{ext}}
+            asset_name_pattern: LiteChat_Linux_amd64_{{version}}.{{ext}}
 
     steps:
       - name: Check out repository
@@ -46,7 +46,6 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # Tauri v2 requires the WebKitGTK 4.1 development package.
           sudo apt-get install -y \
             build-essential \
             curl \
