@@ -18,12 +18,16 @@ jobs:
       matrix:
         include:
           - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
             args: ''
           - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
             args: '--target aarch64-apple-darwin'
           - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
             args: '--target x86_64-apple-darwin'
           - platform: 'ubuntu-22.04'
+            target: 'x86_64-unknown-linux-gnu'
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -41,7 +45,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ contains(matrix.args, 'target') && replace(matrix.args, '--target ', '') || '' }}
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -60,6 +64,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'LiteChat ${{ github.ref_name }}'
           releaseBody: 'LiteChat Desktop App Multi-Platform Build (${{ github.ref_name }})'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
