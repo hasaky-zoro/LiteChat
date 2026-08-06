@@ -21,22 +21,26 @@ jobs:
             runner: windows-latest
             target: x86_64-pc-windows-msvc
             args: --target x86_64-pc-windows-msvc
-            asset_name_pattern: LiteChat_Windows_x64_{{version}}.{{ext}}
+            asset_prefix: LiteChat_Windows_x64
+            artifact_name: windows-x64
           - name: macOS Intel (.dmg)
             runner: macos-latest
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
-            asset_name_pattern: LiteChat_macOS_Intel_{{version}}.dmg
+            asset_prefix: LiteChat_macOS_Intel
+            artifact_name: macos-intel
           - name: macOS Apple Silicon (.dmg)
             runner: macos-latest
             target: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
-            asset_name_pattern: LiteChat_macOS_AppleSilicon_{{version}}.dmg
+            asset_prefix: LiteChat_macOS_AppleSilicon
+            artifact_name: macos-apple-silicon
           - name: Linux (.deb, .AppImage)
             runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             args: --target x86_64-unknown-linux-gnu
-            asset_name_pattern: LiteChat_Linux_amd64_{{version}}.{{ext}}
+            asset_prefix: LiteChat_Linux_amd64
+            artifact_name: linux-amd64
 
     steps:
       - name: Check out repository
@@ -74,15 +78,64 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Build and publish Tauri release
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri bundle
+        run: npm run tauri -- build ${{ matrix.args }}
+
+      # Do not rely on Tauri's generated names: release assets must use these
+      # exact platform names, with the version before the file extension.
+      - name: Rename release assets
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET_PREFIX: ${{ matrix.asset_prefix }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          output_dir="release-assets"
+          mkdir -p "$output_dir"
+
+          shopt -s nullglob
+          assets=(src-tauri/target/${{ matrix.target }}/release/bundle/*/*.{exe,dmg,AppImage,deb})
+          ((${#assets[@]} > 0)) || { echo "No release assets were produced" >&2; exit 1; }
+
+          for asset in "${assets[@]}"; do
+            extension="${asset##*.}"
+            case "$extension" in
+              exe)      name="${ASSET_PREFIX}_v${version}.exe" ;;
+              dmg)      name="${ASSET_PREFIX}_v${version}.dmg" ;;
+              AppImage) name="${ASSET_PREFIX}_v${version}.AppImage" ;;
+              deb)      name="${ASSET_PREFIX}_v${version}.deb" ;;
+              *) echo "Unexpected release asset: $asset" >&2; exit 1 ;;
+            esac
+            destination="$output_dir/$name"
+            [[ ! -e "$destination" ]] || { echo "Duplicate asset name: $name" >&2; exit 1; }
+            mv "$asset" "$destination"
+          done
+
+          printf 'Release assets:\n'
+          find "$output_dir" -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Upload renamed release assets
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "LiteChat ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download this version."
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
-          releaseAssetNamePattern: ${{ matrix.asset_name_pattern }}
+          name: ${{ matrix.artifact_name }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub release
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download renamed release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and upload exact asset names
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "LiteChat ${{ github.ref_name }}"
+          body: "See the assets below to download this version."
+          files: release-assets/*
