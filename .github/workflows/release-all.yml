@@ -93,8 +93,18 @@ jobs:
           output_dir="release-assets"
           mkdir -p "$output_dir"
 
-          shopt -s nullglob
-          assets=(src-tauri/target/${{ matrix.target }}/release/bundle/*/*.{exe,dmg,AppImage,deb})
+          assets=()
+          if [[ "${{ matrix.target }}" == *-apple-darwin ]]; then
+            # Tauri v2 places macOS bundles below target/release/bundle/dmg,
+            # but cross-compilation can change the target-directory prefix.
+            # Search the complete Tauri target tree instead of assuming either.
+            while IFS= read -r -d '' asset; do
+              assets+=("$asset")
+            done < <(find src-tauri/target -type f -name '*.dmg' -print0)
+          else
+            shopt -s nullglob
+            assets=(src-tauri/target/${{ matrix.target }}/release/bundle/*/*.{exe,AppImage,deb})
+          fi
           ((${#assets[@]} > 0)) || { echo "No release assets were produced" >&2; exit 1; }
 
           for asset in "${assets[@]}"; do
@@ -108,7 +118,7 @@ jobs:
             esac
             destination="$output_dir/$name"
             [[ ! -e "$destination" ]] || { echo "Duplicate asset name: $name" >&2; exit 1; }
-            mv "$asset" "$destination"
+            cp "$asset" "$destination"
           done
 
           printf 'Release assets:\n'
