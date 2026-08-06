@@ -1,6 +1,6 @@
 [package]
 name = "litechat"
-version = "1.0.0"
+version = "0.0.1"
 description = "LiteChat desktop application"
 authors = ["LiteChat Contributors"]
 license = "ISC"
