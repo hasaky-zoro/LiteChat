@@ -1,8 +1,0 @@
-@import "tailwindcss";
-
-@layer base {
-  body {
-    user-select: none;
-    -webkit-user-select: none;
-  }
-}
