@@ -1,19 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { providerFromPreset, providerPresets } from '../providers/presets'
 import type { Message, Model, Provider, Session } from '../types'
 import { createId } from '../utils/id'
 
 const id = createId
 const now = () => Date.now()
 
-const defaultProvider: Provider = {
-  id: 'openai',
-  name: 'OpenAI compatible',
-  baseUrl: 'https://api.openai.com/v1',
-  apiKey: '',
-  enabled: true,
-  models: [{ id: 'gpt-4o-mini', name: 'GPT-4o mini', providerId: 'openai' }],
-}
+const defaultProviders: Provider[] = providerPresets.map((preset) => providerFromPreset(preset.id, preset.id))
 
 const createSession = (provider: Provider, model = provider.models[0]): Session => ({
   id: id(),
@@ -98,7 +92,7 @@ interface ChatState {
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
-      providers: [defaultProvider],
+      providers: defaultProviders,
       sessions: [],
       activeSessionId: null,
       settingsOpen: false,

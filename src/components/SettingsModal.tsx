@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Download, Languages, Loader2, Plus, Save, Trash2, X, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useI18n, useI18nStore } from '../i18n'
+import { providerFromPreset, providerPresets, type ProviderPresetId } from '../providers/presets'
 import { ApiError, fetchProviderModels, testProviderConnection } from '../services/api'
 import { useChatStore } from '../store/useChatStore'
 import type { Provider } from '../types'
@@ -16,6 +17,7 @@ export function SettingsModal() {
   const [fetching, setFetching] = useState<Record<string, boolean>>({})
   const [tests, setTests] = useState<Record<string, TestState>>({})
   const [selectedModels, setSelectedModels] = useState<Record<string, string>>({})
+  const [selectedPreset, setSelectedPreset] = useState<ProviderPresetId>('openai')
   const session = activeSessionId ? sessions.find((item) => item.id === activeSessionId) : undefined
 
   useEffect(() => {
@@ -23,6 +25,7 @@ export function SettingsModal() {
     setDrafts(providers)
     setFetching({})
     setTests({})
+    setSelectedPreset('openai')
     setSelectedModels(Object.fromEntries(providers.map((provider) => [provider.id, provider.models?.[0]?.id ?? ''])))
   }, [settingsOpen])
 
@@ -58,6 +61,12 @@ export function SettingsModal() {
     }
   }
 
+  const addPresetProvider = () => {
+    const provider = providerFromPreset(selectedPreset, createId(), selectedPreset === 'openai-compatible' ? t('openaiCompatibleProvider') : undefined)
+    setDrafts((items) => [...items, provider])
+    setSelectedModel(provider.id, provider.models[0]?.id ?? '')
+  }
+
   const save = () => {
     providers.filter((provider) => !drafts.some((draft) => draft.id === provider.id)).forEach((provider) => removeProvider(provider.id))
     drafts.forEach((provider) => providers.some((item) => item.id === provider.id) ? updateProvider(provider) : addProvider(provider))
@@ -82,7 +91,7 @@ export function SettingsModal() {
             {test?.message && <p role="status" className={`mt-3 flex items-start gap-1.5 rounded-md px-2.5 py-2 text-xs ${test.success ? 'bg-emerald-950/60 text-emerald-300' : 'bg-rose-950/60 text-rose-200'}`}>{test.success ? <CheckCircle2 className="mt-0.5 shrink-0" size={14} /> : <AlertCircle className="mt-0.5 shrink-0" size={14} />}<span>{test.message}</span></p>}</div>
           </div>
         })}</div>
-      <footer className="flex justify-between border-t border-slate-800 px-5 py-4"><button onClick={() => { const provider: Provider = { id: createId(), name: t('newProvider'), baseUrl: 'https://api.openai.com/v1', apiKey: '', enabled: true, models: [] }; setDrafts((items) => [...items, provider]); setSelectedModel(provider.id, '') }} className="button-secondary"><Plus size={17} /> {t('addProvider')}</button><button onClick={save} className="button-primary"><Save size={17} /> {t('save')}</button></footer>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 px-5 py-4"><div className="flex flex-wrap items-center gap-2"><label className="m-0 text-sm text-slate-300">{t('providerPreset')}<select value={selectedPreset} onChange={(event) => setSelectedPreset(event.target.value as ProviderPresetId)} className="ml-2 mt-0 w-auto px-2 py-1.5">{providerPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.id === 'openai-compatible' ? t('openaiCompatibleProvider') : preset.name}</option>)}</select></label><button type="button" onClick={addPresetProvider} className="button-secondary"><Plus size={17} /> {t('addProvider')}</button></div><button onClick={save} className="button-primary"><Save size={17} /> {t('save')}</button></footer>
     </section>
   </div>
 }
