@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { ApiError, fetchProviderModels, testProviderConnection } from '../services/api'
 import { useChatStore } from '../store/useChatStore'
 import type { Provider } from '../types'
+import { createId } from '../utils/id'
 
-const blankProvider = (): Provider => ({ id: crypto.randomUUID(), name: 'New provider', baseUrl: 'https://api.openai.com/v1', apiKey: '', enabled: true, models: [] })
+const blankProvider = (): Provider => ({ id: createId(), name: 'New provider', baseUrl: 'https://api.openai.com/v1', apiKey: '', enabled: true, models: [] })
 type TestState = { loading: boolean; message?: string; success?: boolean }
 
 export function SettingsModal() {
@@ -19,13 +20,13 @@ export function SettingsModal() {
     setDrafts(providers)
     setFetching({})
     setTests({})
-    setSelectedModels(Object.fromEntries(providers.map((provider) => [provider.id, provider.models[0]?.id ?? ''])))
+    setSelectedModels(Object.fromEntries(providers.map((provider) => [provider.id, provider.models?.[0]?.id ?? ''])))
   }, [settingsOpen])
 
   if (!settingsOpen) return null
 
   const patch = (providerId: string, changes: Partial<Provider>) => setDrafts((items) => items.map((item) => item.id === providerId ? { ...item, ...changes } : item))
-  const modelFor = (provider: Provider) => selectedModels[provider.id] ?? provider.models[0]?.id ?? ''
+  const modelFor = (provider: Provider) => selectedModels[provider.id] ?? provider.models?.[0]?.id ?? ''
   const setSelectedModel = (providerId: string, model: string) => setSelectedModels((items) => ({ ...items, [providerId]: model }))
 
   const discoverModels = async (provider: Provider) => {

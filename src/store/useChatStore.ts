@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Message, Model, Provider, Session } from '../types'
+import { createId } from '../utils/id'
 
-const id = () => crypto.randomUUID()
+const id = createId
 const now = () => Date.now()
 
 const defaultProvider: Provider = {
@@ -14,7 +15,7 @@ const defaultProvider: Provider = {
   models: [{ id: 'gpt-4o-mini', name: 'GPT-4o mini', providerId: 'openai' }],
 }
 
-const createSession = (provider = defaultProvider, model = provider.models[0]): Session => ({
+const createSession = (provider: Provider, model = provider.models[0]): Session => ({
   id: id(),
   title: 'New chat',
   messages: [],
@@ -25,6 +26,56 @@ const createSession = (provider = defaultProvider, model = provider.models[0]): 
   createdAt: now(),
   updatedAt: now(),
 })
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+/**
+ * localStorage survives application upgrades, so never trust its old or manually edited shape.
+ * In particular, an invalid active ID must not leave a session list without a selected session.
+ */
+const restoreState = (persistedState: unknown, currentState: ChatState) => {
+  if (!isRecord(persistedState)) return currentState
+
+  const providers = Array.isArray(persistedState.providers)
+    ? persistedState.providers.filter(isRecord).map((provider): Provider => ({
+      id: typeof provider.id === 'string' && provider.id ? provider.id : id(),
+      name: typeof provider.name === 'string' ? provider.name : 'Unnamed provider',
+      baseUrl: typeof provider.baseUrl === 'string' ? provider.baseUrl : '',
+      apiKey: typeof provider.apiKey === 'string' ? provider.apiKey : '',
+      enabled: typeof provider.enabled === 'boolean' ? provider.enabled : true,
+      models: Array.isArray(provider.models) ? provider.models.filter(isRecord).map((model): Model => ({
+        id: typeof model.id === 'string' ? model.id : '',
+        name: typeof model.name === 'string' ? model.name : (typeof model.id === 'string' ? model.id : ''),
+        providerId: typeof model.providerId === 'string' ? model.providerId : (typeof provider.id === 'string' ? provider.id : ''),
+        ...(typeof model.contextWindow === 'number' ? { contextWindow: model.contextWindow } : {}),
+      })).filter((model) => model.id) : [],
+    }))
+    : currentState.providers
+  const sessions = Array.isArray(persistedState.sessions)
+    ? persistedState.sessions.filter(isRecord).map((session): Session => ({
+      id: typeof session.id === 'string' && session.id ? session.id : id(),
+      title: typeof session.title === 'string' ? session.title : 'New chat',
+      messages: Array.isArray(session.messages) ? session.messages.filter(isRecord).map((message): Message => ({
+        id: typeof message.id === 'string' && message.id ? message.id : id(),
+        role: message.role === 'system' || message.role === 'user' || message.role === 'assistant' ? message.role : 'assistant',
+        content: typeof message.content === 'string' ? message.content : '',
+        createdAt: typeof message.createdAt === 'number' ? message.createdAt : now(),
+      })) : [],
+      providerId: typeof session.providerId === 'string' ? session.providerId : '',
+      modelId: typeof session.modelId === 'string' ? session.modelId : '',
+      systemPrompt: typeof session.systemPrompt === 'string' ? session.systemPrompt : '',
+      temperature: typeof session.temperature === 'number' ? session.temperature : 0.7,
+      createdAt: typeof session.createdAt === 'number' ? session.createdAt : now(),
+      updatedAt: typeof session.updatedAt === 'number' ? session.updatedAt : now(),
+    }))
+    : currentState.sessions
+  const requestedActiveId = typeof persistedState.activeSessionId === 'string' ? persistedState.activeSessionId : null
+  const activeSessionId = sessions.some((session) => session.id === requestedActiveId)
+    ? requestedActiveId
+    : sessions[0]?.id ?? null
+
+  return { ...currentState, providers, sessions, activeSessionId }
+}
 
 interface ChatState {
   providers: Provider[]
@@ -60,19 +111,27 @@ export const useChatStore = create<ChatState>()(
           ? { ...provider, models: models.map((model) => ({ ...model, providerId })) }
           : provider),
       })),
-      removeProvider: (providerId) => set((state) => ({
-        providers: state.providers.filter((provider) => provider.id !== providerId),
-        sessions: state.sessions.filter((session) => session.providerId !== providerId),
-        activeSessionId: state.activeSessionId && state.sessions.some((session) => session.id === state.activeSessionId && session.providerId === providerId)
-          ? null : state.activeSessionId,
-      })),
+      removeProvider: (providerId) => set((state) => {
+        const sessions = state.sessions.filter((session) => session.providerId !== providerId)
+        return {
+          providers: state.providers.filter((provider) => provider.id !== providerId),
+          sessions,
+          activeSessionId: sessions.some((session) => session.id === state.activeSessionId)
+            ? state.activeSessionId
+            : sessions[0]?.id ?? null,
+        }
+      }),
       createSession: () => {
         const provider = get().providers.find((item) => item.enabled) ?? get().providers[0]
         if (!provider) return
         const session = createSession(provider)
         set((state) => ({ sessions: [session, ...state.sessions], activeSessionId: session.id }))
       },
-      selectSession: (sessionId) => set({ activeSessionId: sessionId }),
+      selectSession: (sessionId) => set((state) => ({
+        activeSessionId: state.sessions.some((session) => session.id === sessionId)
+          ? sessionId
+          : state.sessions[0]?.id ?? null,
+      })),
       deleteSession: (sessionId) => set((state) => {
         const sessions = state.sessions.filter((session) => session.id !== sessionId)
         return {
@@ -110,6 +169,7 @@ export const useChatStore = create<ChatState>()(
         sessions: state.sessions,
         activeSessionId: state.activeSessionId,
       }),
+      merge: restoreState,
     },
   ),
 )
