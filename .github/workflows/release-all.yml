@@ -64,6 +64,12 @@ jobs:
             pkg-config \
             wget
 
+      # Tauri invokes create-dmg when producing the macOS DMG bundle. It is
+      # not guaranteed to be preinstalled on macos-latest images.
+      - name: Install macOS DMG tooling
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
