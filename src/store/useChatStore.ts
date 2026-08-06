@@ -17,7 +17,7 @@ const defaultProvider: Provider = {
 
 const createSession = (provider: Provider, model = provider.models[0]): Session => ({
   id: id(),
-  title: 'New chat',
+  title: '新建对话',
   messages: [],
   providerId: provider.id,
   modelId: model?.id ?? '',
@@ -54,7 +54,7 @@ const restoreState = (persistedState: unknown, currentState: ChatState) => {
   const sessions = Array.isArray(persistedState.sessions)
     ? persistedState.sessions.filter(isRecord).map((session): Session => ({
       id: typeof session.id === 'string' && session.id ? session.id : id(),
-      title: typeof session.title === 'string' ? session.title : 'New chat',
+      title: typeof session.title === 'string' ? session.title : '新建对话',
       messages: Array.isArray(session.messages) ? session.messages.filter(isRecord).map((message): Message => ({
         id: typeof message.id === 'string' && message.id ? message.id : id(),
         role: message.role === 'system' || message.role === 'user' || message.role === 'assistant' ? message.role : 'assistant',
@@ -148,7 +148,7 @@ export const useChatStore = create<ChatState>()(
         sessions: state.sessions.map((session) => session.id === sessionId ? {
           ...session,
           title: session.messages.length === 0 && message.role === 'user'
-            ? message.content.trim().slice(0, 48) || 'New chat' : session.title,
+            ? message.content.trim().slice(0, 48) || '新建对话' : session.title,
           messages: [...session.messages, message],
           updatedAt: now(),
         } : session),
